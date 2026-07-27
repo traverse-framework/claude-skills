@@ -1,0 +1,12 @@
+# Build artifacts, lockfiles, coverage, vendor trees — never index these
+target/
+node_modules/
+dist/
+build/
+coverage/
+*.lock
+Cargo.lock
+package-lock.json
+.DS_Store
+.idea/
+.vscode/
