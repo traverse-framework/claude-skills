@@ -1,6 +1,6 @@
 # Contract, workflow, manifest, and request shapes
 
-All shapes below are verified two ways: against the `CapabilityContract` struct in `crates/traverse-contracts/src/lib.rs` (so field names and required-ness are exact, not guessed), and against a capability built from scratch and run through `traverse-cli agent inspect` to a clean pass. Where the checked-in `scripts/scaffold/new-capability.sh` disagrees with this file, this file is correct and the scaffold script is stale — it predates the current struct and will produce a contract that fails to deserialize.
+All shapes below are verified two ways: against the `CapabilityContract` struct in `crates/traverse-contracts/src/lib.rs` (so field names and required-ness are exact, not guessed), and against capabilities built from scratch and run through `traverse-cli agent inspect` to a clean pass. Where the checked-in `scripts/scaffold/new-capability.sh` disagrees with this file, this file is correct and the scaffold script is stale — it predates the current struct and will produce a contract that fails to deserialize.
 
 ## Capability contract (`contract.json`)
 
@@ -73,7 +73,7 @@ All shapes below are verified two ways: against the `CapabilityContract` struct 
 }
 ```
 
-**Fields every field is required unless noted.** `emits`, `consumes`, `permissions`, `policies`, `dependencies`, `evidence` all need to be present as arrays even when empty — the deserializer doesn't default them. `service_type` and `permitted_targets` DO have real defaults if you omit them (`service_type` → `"stateless"`, `permitted_targets` → all six targets) — but don't rely on the `permitted_targets` default. It defaults to declaring `local`, `browser`, `edge`, `cloud`, `worker`, and `device` all permitted, which is a governance-level "allowed to run here eventually" declaration, not a claim that the runtime can execute there today. Set it explicitly to what you actually mean — almost always just `["local"]` for a new capability — and cross-check against `references/platforms.md` before claiming more.
+**Every field is required unless noted.** `emits`, `consumes`, `permissions`, `policies`, `dependencies`, `evidence` all need to be present as arrays even when empty — the deserializer doesn't default them. `service_type` and `permitted_targets` DO have real defaults if you omit them (`service_type` → `"stateless"`, `permitted_targets` → all six targets) — but don't rely on the `permitted_targets` default. It defaults to declaring `local`, `browser`, `edge`, `cloud`, `worker`, and `device` all permitted, which is a governance-level "allowed to run here eventually" declaration, not a claim that the runtime can execute there today. Set it explicitly to what you actually mean — almost always just `["local"]` for a new capability — and cross-check against `references/platforms.md` before claiming more.
 
 **Enum values, verified against the struct:**
 | Field | Valid values |
@@ -84,7 +84,7 @@ All shapes below are verified two ways: against the `CapabilityContract` struct 
 | `execution.entrypoint.kind` | `wasi-command` (only value defined) |
 | `execution.preferred_targets[]` / `permitted_targets[]` | `local`, `browser`, `edge`, `cloud`, `worker`, `device` |
 | `execution.constraints.host_api_access` | `none`, `exception_required` |
-| `execution.constraints.network_access` | `forbidden`, `required` |
+| `execution.constraints.network_access` | `forbidden`, `required` (see the secrets-check note in the main skill for why `required` is honest-but-currently-unusable — the ABI whitelist doesn't grant network imports to any capability yet) |
 | `execution.constraints.filesystem_access` | `none`, `sandbox_only` |
 | `side_effects[].kind` | `none`, `memory_only`, `event_emission`, `external_call`, `state_change` |
 | `provenance.source` | check `ProvenanceSource` enum in the struct if `greenfield` doesn't fit |
@@ -122,9 +122,11 @@ A package can't register without at least one approved workflow reference — an
 }
 ```
 
+For composing *several* capabilities into a multi-node workflow (not just wrapping one), see `traverse-workflow-planner`'s reference material — that skill owns workflow composition since it starts from the business use case, not from a single already-decided capability.
+
 ## Agent package manifest (`manifest.json`)
 
-This is what `traverse-cli agent inspect`/`agent execute` actually reads. It's a lighter-weight package format than the full application-bundle manifest (see SKILL.md's "Actually running it" section for why that distinction matters).
+This is what `traverse-cli agent inspect`/`agent execute` actually reads. It's a lighter-weight package format than the full application-bundle manifest.
 
 ```json
 {
@@ -157,33 +159,9 @@ This is what `traverse-cli agent inspect`/`agent execute` actually reads. It's a
 }
 ```
 
-The digest is **FNV-1a-64**, formatted `fnv1a64:<16 lowercase hex chars>` — not SHA-256, even though a couple of docs/scripts in the repo (like the stale scaffold script) compute SHA-256. Don't hand-compute it: put a placeholder in, run `agent inspect`, and the tool's own mismatch error tells you the real value to paste in.
+The digest is **FNV-1a-64**, formatted `fnv1a64:<16 lowercase hex chars>` — not SHA-256. Don't hand-compute it: put a placeholder in, run `agent inspect`, and the tool's own mismatch error tells you the real value to paste in.
 
-## Composing multiple atomic capabilities into one workflow
-
-A workflow isn't limited to one node. `workflows/examples/expedition/plan-expedition/workflow.json` in the real repo chains five separate, narrowly-scoped capabilities (capture → interpret → assess → validate → assemble) into one governed traversal:
-
-```json
-{
-  "nodes": [
-    { "node_id": "capture_objective", "capability_id": "expedition.planning.capture-expedition-objective", "capability_version": "1.0.0",
-      "input": { "from_workflow_input": ["destination", "target_window", "preferences", "notes"] },
-      "output": { "to_workflow_state": ["objective"] } },
-    { "node_id": "interpret_intent", "capability_id": "expedition.planning.interpret-expedition-intent", "capability_version": "1.0.0",
-      "input": { "from_workflow_input": ["objective", "planning_intent"] },
-      "output": { "to_workflow_state": ["interpreted_intent"] } }
-  ],
-  "edges": [
-    { "edge_id": "capture_to_interpret", "from": "capture_objective", "to": "interpret_intent", "trigger": "direct" }
-  ],
-  "start_node": "capture_objective",
-  "terminal_nodes": ["assemble_plan"]
-}
-```
-
-**A naming gotcha worth knowing up front:** despite its name, a node's `from_workflow_input` does not only pull from the workflow's top-level input schema — it pulls from the accumulated workflow *state* bag, which includes both the original inputs and every prior node's `to_workflow_state` output. In the example above, `interpret_intent` reads `objective` via `from_workflow_input` even though `objective` isn't one of the workflow's declared top-level inputs — it only exists because `capture_objective` wrote it a step earlier. Don't be misled by the field name into thinking each node is limited to the workflow's original request payload.
-
-This is also the real design argument for keeping each capability atomic (one verb, one responsibility) rather than folding multiple concerns into a single capability: a workflow only composes cleanly if each node's contract is narrow enough to slot into a chain like this. If you're about to write a single capability that captures, interprets, *and* validates all in one binary, consider whether splitting it into workflow nodes instead would make each piece independently reusable and testable — the same way `interpret-expedition-intent` and `validate-team-readiness` can each be discovered and reused on their own (see `references/registry.md`), whereas a monolithic capability can't be.
+Note this is a *different* digest scheme from the public registry index's `digest`/`contract_digest` fields, which are SHA-256 over the published files — `manifest.json`'s `binary.expected_digest` is specifically FNV-1a-64 for the local `agent inspect`/`agent execute` path. Don't cross the two.
 
 ## Runtime request (`runtime-request.json`)
 

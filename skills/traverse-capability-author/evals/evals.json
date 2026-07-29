@@ -1,0 +1,52 @@
+{
+  "skill_name": "traverse-capability-author",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "I need a Traverse capability that calculates a late fee for an overdue invoice. Before you build anything, can you check if something like that already exists?",
+      "expected_output": "Runs the registry-discovery flow (traverse-cli registry sync + reading the synced index.json, or capability discover against a bundle manifest) before proposing to author anything new. Explains the public index is a thin pointer and that contract_url must be fetched to actually evaluate a candidate. Does not jump straight into contract-authoring steps without checking first.",
+      "files": [],
+      "assertions": [
+        "Checks the registry before proposing to author a new capability, rather than jumping straight into writing a new contract.json",
+        "Explains that the registry index is a thin pointer (id/version/digests/URLs) with no summary or description field, and that a candidate's contract_url must be fetched to actually judge whether it fits",
+        "Does not fabricate or assume the existence of a specific pre-built 'late fee' capability without actually checking",
+        "Only proceeds to authoring once the check is done"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "This capability needs to call our internal pricing API with our API key to get the current rate before calculating anything.",
+      "expected_output": "Flags this as a secrets/network problem: explains the ABI whitelist doesn't grant network imports to any capability today, so this can't be done from inside the WASM sandbox regardless of whether the key is embedded or not. Recommends the calling application make the API call and hand the capability only the already-fetched rate as plain input. Does not generate Rust code that hardcodes or reads an API key.",
+      "files": [],
+      "assertions": [
+        "Explicitly refuses to embed the API key in capability source code",
+        "Explains the real reason: the current ABI whitelist doesn't permit network access to any capability, not just a stylistic preference against hardcoded secrets",
+        "Recommends restructuring so the calling application performs the API call and passes the result as plain input to the capability",
+        "Does not silently proceed to write a contract with network_access: required and skip discussing the limitation"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We want to publish this capability, but only for our own internal teams, not the public registry.",
+      "expected_output": "Recognizes this as the public-vs-private decision point, explains the real mechanism (a private registry is a team's own GitHub repo adopting the same layout, reached via --source-repo/--registry-repo-remote, not a hosted service), and asks whether the team already has one configured or needs to set one up (a separate one-time task) before proceeding to publish.",
+      "files": [],
+      "assertions": [
+        "Correctly identifies this as wanting private-registry publication, not public",
+        "Explains the private registry mechanism accurately: a GitHub repo (fork/clone of the standard layout), not a hosted multi-tenant service",
+        "Uses or describes the real flags (--source-repo for sync, --registry-repo-remote for publish) rather than inventing a different mechanism",
+        "Asks whether a private registry already exists for this team rather than assuming one does"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Build me a capability that validates a customer order and then sends a confirmation email.",
+      "expected_output": "Recognizes this as two verbs (validate, send) and therefore two capabilities plus a workflow, not one capability. Recommends handing this off to traverse-workflow-planner rather than authoring one monolithic capability, or at minimum splits it into two separate atomic capability authoring efforts within this skill's own scope.",
+      "files": [],
+      "assertions": [
+        "Identifies that 'validate and send' is two distinct verbs/responsibilities, not one atomic capability",
+        "Either explicitly recommends traverse-workflow-planner for the decomposition/composition, or clearly splits the work into two separate atomic capabilities rather than building one monolithic capability that does both",
+        "Does not silently build a single capability that both validates and sends the email"
+      ]
+    }
+  ]
+}
