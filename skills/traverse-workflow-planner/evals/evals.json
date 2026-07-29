@@ -1,0 +1,40 @@
+{
+  "skill_name": "traverse-workflow-planner",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "We're building an expense approval feature: an employee submits a receipt, it gets validated against policy, and if it passes, a manager gets notified to approve it.",
+      "expected_output": "Decomposes this into three distinct atomic capabilities (submit/capture, validate-against-policy, notify-manager) rather than one monolithic capability, checks the registry for each before assuming all three need to be built, and produces a gap list stating which of the three (if any) already exist and which don't.",
+      "files": [],
+      "assertions": [
+        "Decomposes the use case into at least three distinct single-verb capabilities rather than proposing one capability that does everything",
+        "Checks the registry (or describes doing so) for each identified capability before assuming it needs to be built from scratch",
+        "Produces an explicit gap list distinguishing what already exists from what still needs to be built",
+        "Does not skip straight to workflow composition before the gap list and registry check are done"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "For the validate-against-policy piece, I think we already have something like that in our old Java monolith. What should happen with that gap?",
+      "expected_output": "Routes this gap to traverse-capability-extractor rather than defaulting to traverse-capability-author, since the user has indicated existing logic might already implement it in a known codebase. Explicitly states the routing decision and why.",
+      "files": [],
+      "assertions": [
+        "Explicitly recommends traverse-capability-extractor for this specific gap, not traverse-capability-author",
+        "States the reasoning (existing logic plausibly already implements this in a known repo) rather than routing silently",
+        "Does not default to 'author it from scratch' despite that being the more common default for other gaps"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Once we've built capture, validate, and notify as capabilities, how do we wire them into one workflow?",
+      "expected_output": "Describes the multi-node workflow_definition shape with nodes/edges, using from_workflow_input/to_workflow_state correctly, and demonstrates awareness that from_workflow_input reads the accumulated workflow state (including prior nodes' outputs) rather than only the workflow's original top-level input. Also honestly notes there's no bare `workflow execute` command and describes the real way to run it (the serve composite-capability path).",
+      "files": [],
+      "assertions": [
+        "Describes a multi-node workflow_definition with nodes and edges chaining the three capabilities, not a single-node workflow",
+        "Uses from_workflow_input and to_workflow_state correctly when describing data flow between nodes",
+        "Demonstrates awareness that from_workflow_input reads accumulated workflow state, not only the workflow's original top-level input",
+        "Does not claim a bare `traverse-cli workflow execute` command exists; describes the real execution path (the serve composite-capability approach) if execution is discussed"
+      ]
+    }
+  ]
+}

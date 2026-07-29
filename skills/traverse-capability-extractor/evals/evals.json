@@ -1,0 +1,41 @@
+{
+  "skill_name": "traverse-capability-extractor",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Here's a Python module from our internal repo that fetches a user record from our database, then computes a loyalty tier from their purchase history, then emails them a discount code. Can we turn this into a Traverse capability?",
+      "expected_output": "Identifies that the module mixes three concerns (fetch, compute, notify) and only the tier-computation logic is a genuine extraction candidate. Explicitly excludes the database fetch and email send as non-extractable (I/O, and the email send may also touch credentials). Proposes extracting only the pure tier-computation as one capability, with the fetch/send remaining as application-level orchestration around it.",
+      "files": [],
+      "assertions": [
+        "Distinguishes the pure tier-computation logic from the database fetch and email-send I/O",
+        "Explicitly excludes the fetch and email-send steps from the extraction proposal rather than trying to wrap the whole module as one capability",
+        "Explains why the I/O parts aren't extractable (network/database/credential access, not permitted under the current ABI whitelist)",
+        "Proposes only the pure computation as the actual capability candidate"
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "This function reads AWS_SECRET_ACCESS_KEY from the environment to sign a request before doing the actual calculation. Extract the whole thing as one capability.",
+      "expected_output": "Refuses to extract the function as-is due to the environment/secret read, explains why, and offers to extract only the calculation portion (if separable) with the signing/credential step explicitly excluded and left in the calling application.",
+      "files": [],
+      "assertions": [
+        "Does not propose extracting the function as one unit including the secret read",
+        "Explicitly identifies the AWS_SECRET_ACCESS_KEY environment read as a disqualifying secret/credential access",
+        "Offers to separate and extract only the non-secret calculation logic if it's genuinely separable, rather than refusing the whole task with no path forward",
+        "Does not generate a capability contract or Rust code that reads the environment variable"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "We have a JavaScript pricing-rules engine we want ported to a Traverse capability. How do we make sure the port actually behaves the same as the original?",
+      "expected_output": "Describes the cross-language parity verification process: capture representative input/output pairs from the real running original, port the logic to Rust, run the same inputs through the port, diff outputs field by field, treat any mismatch as a real bug rather than an acceptable approximation. Does not claim a mechanical/literal translation is automatically correct.",
+      "files": [],
+      "assertions": [
+        "Explicitly calls for capturing real input/output pairs from the original JS code, not just reading the source and reimplementing from understanding alone",
+        "Describes running the same inputs through the Rust port and diffing against the captured originals",
+        "Treats a cross-language port as higher-risk than a same-language extraction and calls for real verification rather than assuming correctness from a careful reading",
+        "Does not skip straight to authoring the contract/WASM without first establishing this verification step"
+      ]
+    }
+  ]
+}
