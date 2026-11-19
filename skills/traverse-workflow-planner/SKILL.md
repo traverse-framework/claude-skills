@@ -1,6 +1,6 @@
 ---
 name: traverse-workflow-planner
-description: Takes a business workflow or use case described from a product/business-logic perspective, decomposes it into the individual atomic Traverse capabilities it needs, checks the public and any configured private registry for what already exists, produces a gap list of what still needs to be built, routes each gap to the right skill (traverse-capability-author for net-new logic, traverse-capability-extractor if the logic plausibly already exists unextracted in a known repo), and once every piece exists, drafts the multi-node workflow that composes them. Use this skill when the user describes an app, feature, or business process in terms of what it should accomplish rather than naming a specific capability, asks "what capabilities do I need to build this", wants to compose several capabilities into one workflow, or is planning a Traverse app from a use case down rather than from one capability up. This is the planning half of a three-skill split from the retired traverse-app-builder skill — see traverse-capability-author for authoring one capability and traverse-capability-extractor for pulling one out of existing code.
+description: Takes a business workflow or use case described from a product/business-logic perspective, decomposes it into the individual atomic Traverse capabilities it needs, checks the public and any configured private registry for what already exists, produces a gap list of what still needs to be built, emits a draft structured workflow description (the target plus starting facts that `traverse-cli workflow plan` accepts) with an explicit list of open decisions for the user to settle, routes each gap to the right skill (traverse-capability-author for net-new logic, traverse-capability-extractor if the logic plausibly already exists unextracted in a known repo), and once every piece exists, drafts the multi-node workflow that composes them. Use this skill when the user describes an app, feature, or business process in terms of what it should accomplish rather than naming a specific capability, asks "what capabilities do I need to build this", wants to compose several capabilities into one workflow, or is planning a Traverse app from a use case down rather than from one capability up. This is the planning half of a three-skill split from the retired traverse-app-builder skill — see traverse-capability-author for authoring one capability and traverse-capability-extractor for pulling one out of existing code.
 ---
 
 # From a business workflow to a capability build list
@@ -30,6 +30,15 @@ If a private registry is configured for this team, check it too (`--source-repo 
 
 For every candidate from Step 1 not covered by Step 2, list it explicitly: proposed id/verb, one-sentence description of what it needs to do, and its rough input/output shape as understood from the business description. This gap list is the actual deliverable of this skill for anything that isn't already fully covered by existing capabilities — present it before proceeding to build anything, so the person you're working with can confirm the decomposition makes sense before work starts on each piece.
 
+## Step 3b: emit the structured workflow draft and the open decisions
+
+Alongside the gap list, turn the description into the **structured workflow description** `traverse-cli workflow plan` accepts: a target (`--target-capability <id@version>` or `--target-event <event_type>`) plus a `starting-facts.json` object whose properties match the first capability's `inputs.schema` (Traverse Decision 137 rule 1). `references/workflow-plan-draft.md` has the exact format, the output contract and a verified end-to-end example. Its rules are not optional:
+
+- **Label it a draft.** Put the draft label from the reference at the top. The draft executes nothing and publishes nothing; it's a suggestion the user confirms (Decision 137 rules 1–2).
+- **List every open decision, and resolve none.** Ambiguous steps, the choice of target, any fact whose name or type you had to guess, every placeholder value, and every missing capability from the gap list each go on a numbered list for the user. If you notice you're about to pick between two plausible readings, that choice is an open decision.
+- **Say where the prompt went.** Prompt handling is the policy of the user's own AI tool, and Traverse hosts no model (rule 3). Write the draft only as files in the user's project, where nothing is kept unless they save it (rule 4).
+- **Don't promise candidates.** Show the `workflow plan` command, and be explicit that the planner only chains steps where one upstream capability produces all of the next step's required inputs. An empty `"candidates": []` is an open decision to bring back to the user, not something to patch by inventing mappings.
+
 ## Step 4: route each gap — explicitly, not by default
 
 For each item on the gap list, decide and state which of the other two skills should build it:
@@ -46,5 +55,7 @@ A workflow isn't limited to one node — `references/workflow-composition.md` ha
 **Running a composed workflow, honestly:** `workflow register`/`workflow list`/`workflow inspect` are real, generic CLI functionality — registering and inspecting any workflow you throw at them. There is no bare `traverse-cli workflow execute` command today; the generic way to actually run one end-to-end is `traverse-cli serve`'s composite-capability trick (registering the workflow as a capability whose `implementation_kind` is `workflow`). Every node's binary still has to individually clear the ABI whitelist the same way a standalone capability does — see `traverse-capability-author`'s `references/wasm-implementation.md`. Full detail on both the composition shape and the execution honesty in `references/workflow-composition.md`.
 
 ## Where to go deeper
+
+- `references/workflow-plan-draft.md`: the `workflow plan` input format, the draft-and-open-decisions output contract, a verified plain-English → draft → candidates example, and the planner's current limits.
 
 - `references/workflow-composition.md` — the full multi-node workflow shape, the `plan-expedition` worked example, the `from_workflow_input` gotcha, and the real (and not-yet-real) ways to execute a composed workflow.
