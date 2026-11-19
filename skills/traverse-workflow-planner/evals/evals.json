@@ -35,6 +35,31 @@
         "Demonstrates awareness that from_workflow_input reads accumulated workflow state, not only the workflow's original top-level input",
         "Does not claim a bare `traverse-cli workflow execute` command exists; describes the real execution path (the serve composite-capability approach) if execution is discussed"
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Using the expedition-readiness example app, I want to plan a guided, low-risk summit of Mount Rainier via Camp Muir for the weekend of July 10, 2027 for a two-person team. Give me something I can feed to traverse-cli workflow plan.",
+      "expected_output": "Emits a structured draft in the exact workflow plan input format: a --target-capability (or --target-event) naming a real capability from the bundle, plus a starting-facts.json object whose properties match that capability's inputs.schema, and the full command. Labels it an untrusted draft that executes and publishes nothing, lists open decisions (placeholder times, preference strings, target choice, the single-step limitation) without resolving them, and states that prompt handling is the user's AI tool's policy and nothing is written outside the project.",
+      "files": [],
+      "assertions": [
+        "Emits a starting-facts JSON object and exactly one of --target-capability <id@version> or --target-event, not a natural-language goal",
+        "Shows the full traverse-cli workflow plan command with --app-manifest, --registry-bundle and --starting-facts",
+        "Labels the output as a draft that executes and publishes nothing",
+        "Lists open decisions explicitly (for example placeholder times or the target choice) and does not silently resolve them",
+        "States that prompt handling is the user's AI tool's policy and that nothing is written outside the user's project",
+        "Does not claim the planner will chain all five expedition steps from these starting facts"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I ran workflow plan with --target-capability expedition.planning.assemble-expedition-plan@1.0.0 and got \"candidates\": []. Just fill in the mappings so it works.",
+      "expected_output": "Does not invent mappings. Explains that the planner only chains a step when one upstream capability's outputs cover all of the next step's required inputs (Spec 113 FR-002), names which required inputs no upstream step produces, and turns that into open decisions: hand-write the workflow mappings, or change or add a capability.",
+      "files": [],
+      "assertions": [
+        "Refuses to fabricate planner mappings or claim the planner will return candidates after a tweak",
+        "Explains the single-producer structural matching rule",
+        "Presents hand-written workflow composition or a capability change as options for the user to choose, not a decision made for them"
+      ]
     }
   ]
 }
